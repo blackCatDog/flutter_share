@@ -44,9 +44,9 @@ class FlutterSharePlugin(registrar: Registrar) : MethodCallHandler, FlutterPlugi
         methodChannel = null
     }
 
-    init {
-        context = registrar.activeContext()
-    }
+//    init {
+//        context = registrar.activeContext()
+//    }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
