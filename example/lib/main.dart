@@ -1,55 +1,31 @@
-import 'dart:async';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_share/flutter_share.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:screenshot/screenshot.dart';
 
 void main() => runApp(MyApp());
 
-class MyApp extends StatelessWidget {
-  final _controller = ScreenshotController();
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
 
-  Future<void> share() async {
-    await FlutterShare.share(
-        title: 'Example share',
-        text: 'Example share text',
-        linkUrl: 'https://flutter.dev/',
-        chooserTitle: 'Example Chooser Title');
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
   }
 
-  Future<void> shareFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result == null || result.files.isEmpty) return null;
-
-    await FlutterShare.shareFile(
-      title: 'Example share',
-      text: 'Example share text',
-      filePath: result.files[0] as String,
-    );
-  }
-
-  Future<void> shareScreenshot() async {
-    Directory? directory;
-    if (Platform.isAndroid) {
-      directory = await getExternalStorageDirectory();
-    } else {
-      directory = await getApplicationDocumentsDirectory();
+  Future<void> doWork() async {
+    bool ret = await FlutterShare.isInstallSms();
+    if (ret) {
+      FlutterShare.sendSms(phone: "123", text: "aaaaa");
     }
-    final String localPath =
-        '${directory!.path}/${DateTime.now().toIso8601String()}.png';
-
-    await _controller.captureAndSave(localPath);
-
-    await Future.delayed(Duration(seconds: 1));
-
-    await FlutterShare.shareFile(
-      title: 'Compartilhar comprovante',
-      filePath: localPath,
-      fileType: 'image/png'
-    );
+    ret = await FlutterShare.isInstallWhatsApp();
+    if (ret) {
+      FlutterShare.sendToWhatsApp(text: "哈哈哈 ");
+    }
   }
 
   @override
@@ -60,27 +36,11 @@ class MyApp extends StatelessWidget {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Screenshot(
-            controller: _controller,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                TextButton(
-                  child: Text('Share text and link'),
-                  onPressed: share,
-                ),
-                TextButton(
-                  child: Text('Share local file'),
-                  onPressed: shareFile,
-                ),
-                TextButton(
-                  child: Text('Share screenshot'),
-                  onPressed: shareScreenshot,
-                ),
-              ],
-            ),
-          ),
+          child: RaisedButton(
+              onPressed: () {
+                doWork();
+              },
+              child: Text('Click Me')),
         ),
       ),
     );

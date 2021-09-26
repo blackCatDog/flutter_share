@@ -1,168 +1,77 @@
 import Flutter
 import UIKit
-    
-public class SwiftFlutterSharePlugin: NSObject, FlutterPlugin {
-    
-  private var result: FlutterResult?
+import MessageUI
 
-  public static func register(with registrar: FlutterPluginRegistrar) {
+public class SwiftFlutterSharePlugin: NSObject, FlutterPlugin, UINavigationControllerDelegate, MFMessageComposeViewControllerDelegate {
+    public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "flutter_share", binaryMessenger: registrar.messenger())
-    registrar.addMethodCallDelegate(SwiftFlutterSharePlugin(), channel: channel)
-  }
-
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    if ("share" == call.method) {
-        self.result = result
-        result(share(call: call))
-    } else if ("shareFile" == call.method) {
-        self.result = result
-        result(shareFile(call: call))
-    } else {
-        result(FlutterMethodNotImplemented)
+    let instance = SwiftFlutterSharePlugin()
+    registrar.addMethodCallDelegate(instance, channel: channel)
     }
-  }
 
-    public func share(call: FlutterMethodCall) -> Bool {
-        let args = call.arguments as? [String: Any?]
-
-        let title = args!["title"] as? String
-        let text = args!["text"] as? String
-        let linkUrl = args!["linkUrl"] as? String
-
-        if (title == nil || title!.isEmpty) {
-            return false
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
+        case "isInstallWhatsApp":
+            result(isInstallWhatsApp())
+            break
+        case "isInstallSms":
+            result(isInstallSms())
+            break
+        case "sendSms":
+            let _arguments = call.arguments as! [String : Any]
+            let phone = _arguments["phone"] as? String
+            let text = _arguments["text"] as? String
+            result(sendSms(phone, text: text))
+            break
+        case "sendToWhatsApp":
+            let _arguments = call.arguments as! [String : Any]
+            let text = _arguments["text"] as? String
+            result(sendToWhatsApp(text))
+            break
+        default:
+            break
         }
-
-        var sharedItems : Array<NSObject> = Array()
-        var textList : Array<String> = Array()
-
-        // text
-        if (text != nil && text != "") {
-            textList.append(text!)
-        }
-        // Link url
-        if (linkUrl != nil && linkUrl != "") {
-            textList.append(linkUrl!)
-        }
-
-        var textToShare = ""
-
-        if (!textList.isEmpty) {
-            textToShare = textList.joined(separator: "\n\n")
-        }
-
-        sharedItems.append((textToShare as NSObject?)!)
-
-        let activityViewController = UIActivityViewController(activityItems: sharedItems, applicationActivities: nil)
-
-        // Subject
-        if (title != nil && title != "") {
-            activityViewController.setValue(title, forKeyPath: "subject");
-        }
-
-        // For iPads, fix issue where Exception is thrown by using a popup instead
-        if UIDevice.current.userInterfaceIdiom == .pad {
-          activityViewController.popoverPresentationController?.sourceView = UIApplication.topViewController()?.view
-          if let view = UIApplication.topViewController()?.view {
-              activityViewController.popoverPresentationController?.permittedArrowDirections = []
-              activityViewController.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
-          }
-        }
-
-        DispatchQueue.main.async {
-            self.presentActivityView(activityViewController: activityViewController)
-        }
-
+    }
+    
+    public func isInstallWhatsApp() -> Bool {
+        let url = URL(string: "whatsapp://send?text=Hello%2C%20World!")
+        return UIApplication.shared.canOpenURL(url!)
+    }
+    
+    public func isInstallSms() -> Bool {
+        return MFMessageComposeViewController.canSendText()
+    }
+    
+    public func sendSms(_ phone: String?, text: String?) -> Bool {
+        let controller = MFMessageComposeViewController()
+        controller.body = text!
+        controller.recipients = [phone!]
+        controller.messageComposeDelegate = self
+        UIApplication.shared.keyWindow?.rootViewController?.present(controller, animated: true, completion: nil)
         return true
     }
-
-    public func shareFile(call: FlutterMethodCall) -> Bool {
-        let args = call.arguments as? [String: Any?]
-
-        let title = args!["title"] as? String
-        let text = args!["text"] as? String
-        let filePath = args!["filePath"] as? String
-
-        if (title == nil || title!.isEmpty || filePath == nil || filePath!.isEmpty) {
-            return false
-        }
-
-        var sharedItems : Array<NSObject> = Array()
-
-        // text
-        if (text != nil && text != "") {
-            sharedItems.append((text as NSObject?)!)
-        }
-
-        // File url
-        if (filePath != nil && filePath != "") {
-            let filePath = URL(fileURLWithPath: filePath!)
-            sharedItems.append(filePath as NSObject);
-        }
-
-        let activityViewController = UIActivityViewController(activityItems: sharedItems, applicationActivities: nil)
-
-        // Subject
-        if (title != nil && title != "") {
-            activityViewController.setValue(title, forKeyPath: "subject");
-        }
-
-        // For iPads, fix issue where Exception is thrown by using a popup instead
-        if UIDevice.current.userInterfaceIdiom == .pad {
-          activityViewController.popoverPresentationController?.sourceView = UIApplication.topViewController()?.view
-          if let view = UIApplication.topViewController()?.view {
-              activityViewController.popoverPresentationController?.permittedArrowDirections = []
-              activityViewController.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
-          }
-        }
-
-        DispatchQueue.main.async {
-          UIApplication.topViewController()?.present(activityViewController, animated: true, completion: nil)
-        }
-        
-        return true
-    }
-
-    private func presentActivityView(activityViewController: UIActivityViewController) {
-        // using this fake view controller to prevent this iOS 13+ dismissing the top view when sharing with "Save Image" option
-
-        let fakeViewController = TransparentViewController()
-        fakeViewController.modalPresentationStyle = .overFullScreen
-
-        activityViewController.completionWithItemsHandler = { [weak fakeViewController] _, _, _, _ in
-            if let presentingViewController = fakeViewController?.presentingViewController {
-                presentingViewController.dismiss(animated: false, completion: nil)
+    
+    public func sendToWhatsApp(_ text: String?) -> Bool {
+        let str = String(format: "whatsapp://send?text=%@", text!.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)!)
+        let url = URL(string: str)
+        if (UIApplication.shared.canOpenURL(url!)) {
+            if #available(iOS 10.0, *) {
+                UIApplication.shared.open(url!, options: [:], completionHandler: nil)
             } else {
-                fakeViewController?.dismiss(animated: false, completion: nil)
+                UIApplication.shared.openURL(url!)
             }
-        }
-
-        UIApplication.topViewController()?.present(fakeViewController, animated: true) { [weak fakeViewController] in
-            fakeViewController?.present(activityViewController, animated: true, completion: nil)
+            return true
+        } else {
+            return false
         }
     }
-}
-
-extension UIApplication {
-    class func topViewController(controller: UIViewController? = UIApplication.shared.keyWindow?.rootViewController) -> UIViewController? {
-        if let navigationController = controller as? UINavigationController {
-            return topViewController(controller: navigationController.visibleViewController)
-        }
-        if let tabController = controller as? UITabBarController {
-            if let selected = tabController.selectedViewController {
-                return topViewController(controller: selected)
-            }
-        }
-        if let presented = controller?.presentedViewController {
-            return topViewController(controller: presented)
-        }
-        return controller
-    }
-}
-
-class TransparentViewController: UIViewController {
-    override func viewDidLoad() {
-        view.backgroundColor = UIColor.clear
-        view.isOpaque = false
+    
+    public func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
+        let _: [MessageComposeResult: String] = [
+            MessageComposeResult.sent: "sent",
+            MessageComposeResult.cancelled: "cancelled",
+            MessageComposeResult.failed: "failed",
+        ]
+        UIApplication.shared.keyWindow?.rootViewController?.dismiss(animated: true, completion: nil)
     }
 }
